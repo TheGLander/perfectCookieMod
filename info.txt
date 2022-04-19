@@ -1,0 +1,12 @@
+{
+	"Name": "Perfect cookie selector",
+	"ID": "perfectCookieSelector",
+	"Author": "EDIT THIS",
+	"Description": "EDIT THIS",
+	"ModVersion": 1,
+	"GameVersion": 2.043,
+	"Date": "18/04/2022",
+	"Dependencies": [],
+	"Disabled": 1,
+	"AllowSteamAchievs": 1
+}
