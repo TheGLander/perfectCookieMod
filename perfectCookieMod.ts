@@ -67,24 +67,50 @@ namespace PCSelector {
 		if (!image) {
 			reportIssue("couldn't find the asset image")
 		}
-		images.set(type, image)
+		type.image = image
+
+		let shadowImage: HTMLImageElement
+		const cachedImage = shadowCache.get(type.shadowLink)
+		if (cachedImage) shadowImage = cachedImage
+		else {
+			if (type.shadowLink === null)
+				shadowImage = Game.Loader.assets["cookieShadow.png"]
+			else {
+				shadowImage = document.createElement("img")
+				shadowImage.src = type.shadowLink
+			}
+			shadowCache.set(type.shadowLink, shadowImage)
+		}
+		if (!shadowImage) {
+			reportIssue("couldn't find the asset image (shadow)")
+		}
+		type.shadowImage = shadowImage
 	}
-	export const images: Map<PCType, HTMLImageElement> = new Map()
 	export const pcTypes: PCType[] = []
+	export const shadowCache: Map<string | null, HTMLImageElement> = new Map()
 	export class PCType {
+		image?: HTMLImageElement
+		shadowImage?: HTMLImageElement
 		constructor(
 			public name: string,
 			public link: string | null,
 			public icon: Game.Icon = [25, 12],
-			public reqirement?: () => boolean
+			public reqirement?: () => boolean,
+			public shadowLink: string | null = null
 		) {
 			loadTypeImage(this)
 			pcTypes.push(this)
 		}
 	}
 	export class PCCookieType extends PCType {
-		constructor(upgrade: Game.Upgrade, link: string) {
-			super(upgrade.name, link, upgrade.icon, () => !!upgrade.bought)
+		constructor(upgrade: Game.Upgrade, link: string, shadowLink?: string) {
+			super(
+				upgrade.name,
+				link,
+				upgrade.icon,
+				() => !!upgrade.bought,
+				shadowLink
+			)
 		}
 	}
 
@@ -100,12 +126,18 @@ namespace PCSelector {
 			reportIssue("couldn't find a perfect cookie type")
 			return
 		}
-		const img = images.get(selectedType)
+		const img = selectedType.image
 		if (!img) {
 			reportIssue("couldn't find the perfect cookie image")
 			return
 		}
 		Game.Loader.assets["perfectCookie.png"] = img
+		const shadowImg = selectedType.shadowImage
+		if (!shadowImg) {
+			reportIssue("couldn't find the perfect cookie image (shadow)")
+			return
+		}
+		Game.Loader.assets["cookieShadow.png"] = shadowImg
 	}
 	let hu: Game.HeavenlyUpgrade
 	let upgrade: Game.SelectorSwitch
@@ -189,43 +221,58 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 				upgrade.unlocked = hu.bought
 				updatePerfectCookie()
 			})
-			await waitForValue(() => Game.Loader.assets["perfectCookie.png"])
+			Game.Loader.Load(["perfectCookie.png", "cookieShadow.png"])
+			await waitForValue(
+				() =>
+					Game.Loader.assets["perfectCookie.png"] &&
+					Game.Loader.assets["cookieShadow.png"]
+			)
 			new PCType("Default", null, [10, 0])
 			new PCCookieType(
 				Game.Upgrades["Heavenly cookies"],
-				getResource("cookieImages/heavenly_cookies.png")
+				getResource("cookieImages/heavenly_cookies.png"),
+				getResource("cookieShadows/heavenly_light.png")
 			)
 			new PCCookieType(
 				Game.Upgrades["Snowflake biscuits"],
-				getResource("cookieImages/snowflake_biscuits.png")
+				getResource("cookieImages/snowflake_biscuits.png"),
+				getResource("cookieShadows/snowflake_shadow.png")
 			)
+			const heartShadow = getResource("cookieShadows/heart_shadow.png")
 			new PCCookieType(
 				Game.Upgrades["Pure heart biscuits"],
-				getResource("cookieImages/pure_heart_biscuits.png")
+				getResource("cookieImages/pure_heart_biscuits.png"),
+				heartShadow
 			)
 			new PCCookieType(
 				Game.Upgrades["Ardent heart biscuits"],
-				getResource("cookieImages/ardent_heart_biscuits.png")
+				getResource("cookieImages/ardent_heart_biscuits.png"),
+				heartShadow
 			)
 			new PCCookieType(
 				Game.Upgrades["Sour heart biscuits"],
-				getResource("cookieImages/sour_heart_biscuits.png")
+				getResource("cookieImages/sour_heart_biscuits.png"),
+				heartShadow
 			)
 			new PCCookieType(
 				Game.Upgrades["Weeping heart biscuits"],
-				getResource("cookieImages/weeping_heart_biscuits.png")
+				getResource("cookieImages/weeping_heart_biscuits.png"),
+				heartShadow
 			)
 			new PCCookieType(
 				Game.Upgrades["Golden heart biscuits"],
-				getResource("cookieImages/golden_heart_biscuits.png")
+				getResource("cookieImages/golden_heart_biscuits.png"),
+				heartShadow
 			)
 			new PCCookieType(
 				Game.Upgrades["Eternal heart biscuits"],
-				getResource("cookieImages/eternal_heart_biscuits.png")
+				getResource("cookieImages/eternal_heart_biscuits.png"),
+				heartShadow
 			)
 			new PCCookieType(
 				Game.Upgrades["Prism heart biscuits"],
-				getResource("cookieImages/prism_heart_biscuits.png")
+				getResource("cookieImages/prism_heart_biscuits.png"),
+				heartShadow
 			)
 			ready = true
 			this.load?.(this.save?.() || "")
