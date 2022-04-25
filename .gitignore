@@ -2,6 +2,5 @@ node_modules/
 *.js
 mod/
 perfectCookieMod.zip
-assets/
 mod.zip
 .DS_Store
