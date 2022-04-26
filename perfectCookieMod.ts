@@ -13,17 +13,109 @@
  */
 
 interface ModSave {
-	selectedType: string
+	selectedType: string | null
 	huBought: boolean
+	lastCookieBought: string
 }
 
 declare function writeIcon(icon: Game.Icon): string
 
 namespace PCSelector {
-	export const modName = "perfectCookieSelector"
-	export const webPath = "https://glander.club/perfectCookieSelector"
+	/**
+	 * A helper function which escapes special regex characters.
+	 * @param str The string to escape
+	 * @helper
+	 */
+	function escapeRegExp(str: string): string {
+		// eslint-disable-next-line no-useless-escape
+		return str.replace(/([.*+?^=!:${}()|\[\]\/\\])/g, "\\$1")
+	}
+	/**
+	 * The parameters of an injection, in order: `source`, `target`, `where`
+	 */
+	type InjectParams = [
+		string | RegExp | null,
+		string,
+		"before" | "replace" | "after"
+	]
+	/**
+	 * A helper helper function, which does a single inject to code
+	 * @param source The code to perform the inject on
+	 * @param config The configuration of the inject
+	 * @helper
+	 * @helperhelper
+	 */
+	function doSingleInject(source: string, config: InjectParams): string {
+		const sliceMode = config[0] === null
+		// Do this to mute typescript silly wrong errors
+		let regex = new RegExp("")
+		if (config[0] !== null) {
+			if (typeof config[0] === "string")
+				regex = new RegExp(escapeRegExp(config[0]), "g")
+			else regex = config[0]
+			if (!regex.test(source)) console.warn("Nothing to inject.")
+		}
 
-	export let save: ModSave = { selectedType: "Default", huBought: false }
+		const findStart = /(\)[^{]*{)/
+		const findEnd = /(}?)$/
+
+		switch (config[2]) {
+			case "before":
+				if (sliceMode) source = source.replace(findStart, `$1${config[1]}`)
+				else source = source.replace(regex, `${config[1]}${config[0]}`)
+				break
+			case "replace":
+				if (sliceMode) source = config[1]
+				else source = source.replace(regex, config[1])
+				break
+			case "after":
+				if (sliceMode) source = source.replace(findEnd, `${config[1]}$1`)
+				else source = source.replace(regex, `${config[0]}${config[1]}`)
+				break
+			default:
+				throw new Error(
+					'where Parameter must be "before", "replace" or "after"'
+				)
+		}
+		return source
+	}
+	/**
+	 * A helper function which replaces(or appends) code in a function, returning the new function, and it's eval free!
+	 * @param func The source function
+	 * @param source What to replace, can be null for slicing
+	 * @param target What to put instead of (or before/after) the source
+	 * @param where Where to insert or replace your injection
+	 * @param context The optional context to use
+	 * @helper
+	 */
+	function injectCode<
+		T extends ((...args: any[]) => any) | (new (...args: any[]) => any)
+	>(
+		func: T,
+		source: string | RegExp | null,
+		target: string,
+		where: "before" | "replace" | "after",
+		context: Record<string, any> = {}
+	): T {
+		const newFunc = Function(
+			...Object.keys(context),
+			`return (${doSingleInject(func.toString(), [source, target, where])})`
+		)(...Object.values(context))
+		newFunc.prototype = func.prototype
+		return newFunc
+	}
+
+	export const modName = "perfectCookieSelector"
+	export const defaultCookieName = "Chocolate chip cookies (Default)"
+	export const webPath = true
+		? "http://localhost:5500/assets"
+		: "https://glander.club/perfectCookieSelector"
+
+	export let save: ModSave = {
+		selectedType: "Default",
+		huBought: false,
+		lastCookieBought: "Chocolate chip cookies",
+	}
 	function reportIssue(reason: string): void {
 		debugger
 		Game.Prompt(`Hi, ${reason}.<br>Please report this. (${modName})`, ["OK"])
@@ -51,9 +143,13 @@ namespace PCSelector {
 	}
 	function waitForValue<T>(valFunc: () => T, interval = 100): Promise<T> {
 		return new Promise(res => {
-			setInterval(() => {
+			const id = setInterval(() => {
+				console.log("check")
 				const val = valFunc()
-				if (val) res(val)
+				if (val) {
+					res(val)
+					clearInterval(id)
+				}
 			}, interval)
 		})
 	}
@@ -87,6 +183,7 @@ namespace PCSelector {
 		type.shadowImage = shadowImage
 	}
 	export const pcTypes: PCType[] = []
+	export const pcTypesByName: Record<string, PCType> = {}
 	export const shadowCache: Map<string | null, HTMLImageElement> = new Map()
 	export class PCType {
 		image?: HTMLImageElement
@@ -100,6 +197,7 @@ namespace PCSelector {
 		) {
 			loadTypeImage(this)
 			pcTypes.push(this)
+			pcTypesByName[name] = this
 		}
 	}
 	export class PCCookieType extends PCType {
@@ -118,10 +216,8 @@ namespace PCSelector {
 
 	export function updatePerfectCookie(): void {
 		if (!ready) return
-		const selectedType =
-			pcTypes.find(
-				val => val.name === save.selectedType && val.reqirement?.()
-			) || pcTypes.find(val => val.name === "Default")
+
+		const selectedType = getActivePC()
 		if (!selectedType) {
 			reportIssue("couldn't find a perfect cookie type")
 			return
@@ -142,8 +238,38 @@ namespace PCSelector {
 	let hu: Game.HeavenlyUpgrade
 	let upgrade: Game.SelectorSwitch
 
+	export function onUpgradeBuy(
+		upgrade: Game.Upgrade,
+		success: Game.PseudoBoolean
+	): void {
+		if (upgrade.pool !== "cookie" || !success || !pcTypesByName[upgrade.name])
+			return
+		save.lastCookieBought = upgrade.name
+	}
+
+	export function getActivePC(): PCType {
+		let type: PCType | undefined
+		//save.selectedType
+
+		type =
+			pcTypesByName[
+				save.selectedType === null ? save.lastCookieBought : save.selectedType
+			]
+		if (type?.reqirement && !type.reqirement()) type = undefined
+
+		if (type) return type
+		// Fall back to the default cookie
+		return pcTypesByName[defaultCookieName]
+	}
+
 	Game.registerMod(modName, {
 		async init(this: Game.Mod) {
+			Game.Upgrade.prototype.buy = injectCode(
+				Game.Upgrade.prototype.buy,
+				"return success;",
+				"PCSelector.onUpgradeBuy(this, success);\n",
+				"before"
+			)
 			hu = new Game.Upgrade(
 				"Dessert showcase",
 				`Unlocks the <b>Perfect cookie selector</b>, letting you select your unlocked cookies as the perfect cookie on the left.<br>
@@ -172,17 +298,23 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 				[0, 0, getResource("pcs_icon.png")]
 			) as Game.SelectorSwitch
 			upgrade.descFunc = () => {
-				const selectedType =
-					pcTypes.find(
-						val => val.name === save.selectedType && val.reqirement?.()
-					) || pcTypes.find(val => val.name === "Default")
-				if (!selectedType) return "what"
+				let name: string
+				let icon: Game.Icon
+				if (!save.selectedType) {
+					name = "Auto"
+					icon = [0, 7]
+				} else {
+					const selectedType = getActivePC()
+					name = selectedType.name
+					icon = selectedType.icon
+				}
+
 				return `<div style="text-align:center;">${loc(
 					"Current:"
 				)} <div class="icon" style="vertical-align:middle;display:inline-block;${writeIcon(
-					selectedType.icon
+					icon
 				)}transform:scale(0.5);margin:-16px;"></div> <b>${loc(
-					selectedType.name
+					name
 				)}</b></div><div class="line"></div>${
 					//@ts-expect-error Forgot this in the typings
 					upgrade.ddesc
@@ -195,23 +327,48 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 			upgrade.pool = "toggle"
 			//@ts-expect-error This also takes PseudoNulls
 			upgrade.choicesFunction = () => {
-				return pcTypes.map<Game.SelectorSwitchChoice | Game.PseudoNull>(val => {
-					if (val.reqirement && !val.reqirement()) return 0
-					return {
-						name: loc(val.name),
-						icon: val.icon,
-						selected: val.name === save.selectedType,
-					}
+				const types: (Game.SelectorSwitchChoice | Game.PseudoNull)[] =
+					pcTypes.map(val => {
+						if (val.reqirement && !val.reqirement()) return 0
+						return {
+							name: loc(val.name),
+							icon: val.icon,
+							selected: val.name === save.selectedType,
+						}
+					})
+				types.unshift({
+					icon: [0, 7],
+					name: "Auto",
+					selected: save.selectedType === null,
 				})
+				return types
 			}
 			upgrade.choicesPick = (num: number) => {
-				const chosen = pcTypes[num]
-				save.selectedType = chosen.name
+				if (num === 0) save.selectedType = null
+				else {
+					const chosen = pcTypes[num - 1]
+					save.selectedType = chosen.name
+				}
 				updatePerfectCookie()
 			}
 			Game.registerHook("reset", hard => {
-				if (!hard) return
-				save.selectedType = "Default"
+				if (!hard) {
+					const candidates: PCType[] = []
+					candidates.push(pcTypesByName[defaultCookieName])
+					for (const cookie of Game.cookieUpgrades) {
+						if (
+							cookie.pool === "prestige" &&
+							cookie.bought &&
+							pcTypesByName[cookie.name]
+						) {
+							candidates.push(pcTypesByName[cookie.name])
+						}
+					}
+					save.lastCookieBought =
+						candidates[Math.floor(Math.random() * candidates.length)].name
+					return
+				}
+				save.selectedType = null
 				save.huBought = false
 			})
 			Game.registerHook("logic", () => {
@@ -227,7 +384,7 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 					Game.Loader.assets["perfectCookie.png"] &&
 					Game.Loader.assets["cookieShadow.png"]
 			)
-			new PCType("Default", null, [10, 0])
+			new PCType(defaultCookieName, null, [10, 0])
 			new PCCookieType(
 				Game.Upgrades["Heavenly cookies"],
 				getResource("cookieImages/heavenly_cookies.png"),
@@ -285,6 +442,8 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 			save = JSON.parse(data)
 			updatePerfectCookie()
 			hu.bought = upgrade.unlocked = save.huBought
+			if (!save.lastCookieBought)
+				save.lastCookieBought = "Chocolate chip cookie"
 			Game.upgradesToRebuild = 1
 		},
 	})
