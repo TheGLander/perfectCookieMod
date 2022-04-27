@@ -153,62 +153,72 @@ namespace PCSelector {
 			}, interval)
 		})
 	}
-	export function loadTypeImage(type: PCType): void {
-		let image: HTMLImageElement
-		if (type.link === null) image = Game.Loader.assets["perfectCookie.png"]
-		else {
-			image = document.createElement("img")
-			image.src = type.link
-		}
-		if (!image) {
-			reportIssue("couldn't find the asset image")
-		}
-		type.image = image
 
-		let shadowImage: HTMLImageElement
-		const cachedImage = shadowCache.get(type.shadowLink)
-		if (cachedImage) shadowImage = cachedImage
-		else {
-			if (type.shadowLink === null)
-				shadowImage = Game.Loader.assets["cookieShadow.png"]
-			else {
-				shadowImage = document.createElement("img")
-				shadowImage.src = type.shadowLink
-			}
-			shadowCache.set(type.shadowLink, shadowImage)
-		}
-		if (!shadowImage) {
-			reportIssue("couldn't find the asset image (shadow)")
-		}
-		type.shadowImage = shadowImage
-	}
 	export const pcTypes: PCType[] = []
 	export const pcTypesByName: Record<string, PCType> = {}
-	export const shadowCache: Map<string | null, HTMLImageElement> = new Map()
+
+	export const assetTypes = [
+		"cookie",
+		"shadow",
+		"brokenCookieHalo",
+		"brokenCookie",
+	] as const
+	export const assetTypesRequired = ["cookie"] as const
+	export const assetAssociatedFiles: Record<AssetTypes, string> = {
+		brokenCookie: "brokenCookie.png",
+		brokenCookieHalo: "brokenCookieHalo.png",
+		cookie: "perfectCookie.png",
+		shadow: "cookieShadow.png",
+	}
+	export const assetDefaults: Record<AssetTypes, HTMLImageElement> = {
+		brokenCookie: Game.Loader.assets["brokenCookie.png"],
+		brokenCookieHalo: Game.Loader.assets["brokenCookieHalo.png"],
+		cookie: Game.Loader.assets["perfectCookie.png"],
+		shadow: Game.Loader.assets["cookieShadow.png"],
+	}
+
+	export type AssetTypes = typeof assetTypes[number]
+	export type AssetOpenMapped<V> = Record<AssetTypes, V>
+	export type AssetsTypesRequired = typeof assetTypesRequired[number]
+	export type AssetMapped<V> = Partial<
+		Record<Exclude<AssetTypes, AssetsTypesRequired>, V>
+	> &
+		Record<AssetsTypesRequired, V>
+
 	export class PCType {
-		image?: HTMLImageElement
-		shadowImage?: HTMLImageElement
+		assetImages: AssetMapped<HTMLImageElement>
 		constructor(
 			public name: string,
-			public link: string | null,
+			public assetLinks: AssetMapped<string | null>,
 			public icon: Game.Icon = [25, 12],
-			public reqirement?: () => boolean,
-			public shadowLink: string | null = null
+			public reqirement?: () => boolean
 		) {
-			loadTypeImage(this)
+			//@ts-expect-error We assign to it later
+			this.assetImages = {}
+			for (const assetName of assetTypes) {
+				if (
+					!(assetName in assetLinks) &&
+					assetTypesRequired.includes(assetName as AssetsTypesRequired)
+				) {
+					throw new Error("Didn't supply a required asset type!")
+				}
+				const assetLink = assetLinks[assetName]
+				let img
+				if (!assetLink) {
+					img = assetDefaults[assetName]
+				} else {
+					img = document.createElement("img")
+					img.src = assetLink
+				}
+				this.assetImages[assetName] = img
+			}
 			pcTypes.push(this)
 			pcTypesByName[name] = this
 		}
 	}
 	export class PCCookieType extends PCType {
-		constructor(upgrade: Game.Upgrade, link: string, shadowLink?: string) {
-			super(
-				upgrade.name,
-				link,
-				upgrade.icon,
-				() => !!upgrade.bought,
-				shadowLink
-			)
+		constructor(upgrade: Game.Upgrade, assets: AssetMapped<string | null>) {
+			super(upgrade.name, assets, upgrade.icon, () => !!upgrade.bought)
 		}
 	}
 
@@ -222,18 +232,16 @@ namespace PCSelector {
 			reportIssue("couldn't find a perfect cookie type")
 			return
 		}
-		const img = selectedType.image
-		if (!img) {
-			reportIssue("couldn't find the perfect cookie image")
-			return
+		for (const assetType of assetTypes) {
+			const asset = selectedType.assetImages[assetType]
+			if (!asset) {
+				reportIssue(
+					`couldn't find a perfect cookie asset (${assetType} in ${selectedType.name})`
+				)
+				return
+			}
+			Game.Loader.assets[assetAssociatedFiles[assetType]] = asset
 		}
-		Game.Loader.assets["perfectCookie.png"] = img
-		const shadowImg = selectedType.shadowImage
-		if (!shadowImg) {
-			reportIssue("couldn't find the perfect cookie image (shadow)")
-			return
-		}
-		Game.Loader.assets["cookieShadow.png"] = shadowImg
 	}
 	let hu: Game.HeavenlyUpgrade
 	let upgrade: Game.SelectorSwitch
@@ -269,6 +277,13 @@ namespace PCSelector {
 				"return success;",
 				"PCSelector.onUpgradeBuy(this, success);\n",
 				"before"
+			)
+			Game.DrawBackground = injectCode(
+				Game.DrawBackground,
+				"ctx.drawImage(Pic('brokenCookie.png'),256*(chunks[i]),0,256,256",
+				`const brokenSize = Pic('brokenCookie.png').height;
+ctx.drawImage(Pic('brokenCookie.png'),brokenSize*(chunks[i]),0,brokenSize,brokenSize`,
+				"replace"
 			)
 			hu = new Game.Upgrade(
 				"Dessert showcase",
@@ -384,53 +399,75 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 					Game.Loader.assets["perfectCookie.png"] &&
 					Game.Loader.assets["cookieShadow.png"]
 			)
-			new PCType(defaultCookieName, null, [10, 0])
-			new PCCookieType(
-				Game.Upgrades["Heavenly cookies"],
-				getResource("cookieImages/heavenly_cookies.png"),
-				getResource("cookieShadows/heavenly_light.png")
-			)
-			new PCCookieType(
-				Game.Upgrades["Snowflake biscuits"],
-				getResource("cookieImages/snowflake_biscuits.png"),
-				getResource("cookieShadows/snowflake_shadow.png")
-			)
-			const heartShadow = getResource("cookieShadows/heart_shadow.png")
-			new PCCookieType(
-				Game.Upgrades["Pure heart biscuits"],
-				getResource("cookieImages/pure_heart_biscuits.png"),
-				heartShadow
-			)
-			new PCCookieType(
-				Game.Upgrades["Ardent heart biscuits"],
-				getResource("cookieImages/ardent_heart_biscuits.png"),
-				heartShadow
-			)
-			new PCCookieType(
-				Game.Upgrades["Sour heart biscuits"],
-				getResource("cookieImages/sour_heart_biscuits.png"),
-				heartShadow
-			)
-			new PCCookieType(
-				Game.Upgrades["Weeping heart biscuits"],
-				getResource("cookieImages/weeping_heart_biscuits.png"),
-				heartShadow
-			)
-			new PCCookieType(
-				Game.Upgrades["Golden heart biscuits"],
-				getResource("cookieImages/golden_heart_biscuits.png"),
-				heartShadow
-			)
-			new PCCookieType(
-				Game.Upgrades["Eternal heart biscuits"],
-				getResource("cookieImages/eternal_heart_biscuits.png"),
-				heartShadow
-			)
-			new PCCookieType(
-				Game.Upgrades["Prism heart biscuits"],
-				getResource("cookieImages/prism_heart_biscuits.png"),
-				heartShadow
-			)
+			new PCType(defaultCookieName, { cookie: null }, [10, 0])
+			function createCookieType(
+				name: string,
+				overrides?: Partial<AssetOpenMapped<string>>
+			): void {
+				const cookieName = name.toLocaleLowerCase().replace(/ /g, "_")
+				const shortName = cookieName.replace(/_(cookies|biscuits)$/, "")
+				new PCCookieType(Game.Upgrades[name], {
+					cookie: getResource(
+						`cookieImages/${overrides?.cookie ?? cookieName}.png`
+					),
+					brokenCookie: getResource(
+						`cookieBroken/${
+							overrides?.brokenCookie ?? `${shortName}_broken`
+						}.png`
+					),
+					brokenCookieHalo: getResource(
+						`cookieHalos/${overrides?.brokenCookieHalo ?? "cookie_halo"}.png`
+					),
+					shadow: getResource(
+						`cookieShadows/${overrides?.shadow ?? "cookie_shadow"}.png`
+					),
+				})
+			}
+			createCookieType("Heavenly cookies", {
+				shadow: "heavenly_light",
+				brokenCookieHalo: "heavenly_halo",
+			})
+			createCookieType("Snowflake biscuits", {
+				shadow: "snowflake_shadow",
+				brokenCookieHalo: "snowflake_halo",
+			})
+			createCookieType("Pure heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "pure_heart_halo",
+			})
+			createCookieType("Ardent heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "heart_halo",
+			})
+			createCookieType("Sour heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "heart_halo",
+			})
+			createCookieType("Weeping heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "heart_halo",
+			})
+			createCookieType("Golden heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "heart_halo",
+			})
+			createCookieType("Eternal heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "heart_halo",
+			})
+			createCookieType("Prism heart biscuits", {
+				shadow: "heart_shadow",
+				brokenCookieHalo: "prism_heart_halo",
+			})
+			createCookieType("Wrinkly cookies", {
+				brokenCookieHalo: "wrinkly_halo",
+			})
+			createCookieType("Sugar crystal cookies", {
+				brokenCookieHalo: "sugar_crystal_halo",
+			})
+			createCookieType("Zebra cookies")
+			createCookieType("Eclipse cookies")
+			createCookieType("Plain cookies")
 			ready = true
 			this.load?.(this.save?.() || "")
 		},
