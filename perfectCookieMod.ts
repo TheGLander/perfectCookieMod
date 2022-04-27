@@ -468,7 +468,9 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 			createCookieType("Zebra cookies")
 			createCookieType("Eclipse cookies")
 			createCookieType("Plain cookies")
-			createCookieType("Cookie crumbs")
+			createCookieType("Cookie crumbs", {
+				brokenCookieHalo: "cookie_crubs_halo",
+			})
 			ready = true
 			this.load?.(this.save?.() || "")
 		},
