@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
-yarn tsc
-rm -r dist
+yarn build
+rm -r mod
 cp -r ./assets/. ./mod
 cp perfectCookieMod.js ./mod/main.js
 cp perfectCookieMod.ts ./mod/sourceCode.ts
