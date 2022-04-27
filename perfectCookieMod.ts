@@ -107,7 +107,7 @@ namespace PCSelector {
 
 	export const modName = "perfectCookieSelector"
 	export const defaultCookieName = "Chocolate chip cookies (Default)"
-	export const webPath = true
+	export const webPath = false
 		? "http://localhost:5500/assets"
 		: "https://glander.club/perfectCookieSelector"
 
