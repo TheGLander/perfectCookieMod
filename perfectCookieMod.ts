@@ -308,7 +308,7 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 
 			upgrade = new Game.Upgrade(
 				"Perfect cookie selector",
-				"Lets you change how the perfect cookie looks.",
+				"Lets you pick what flavor of perfect cookie to display.",
 				0,
 				[0, 0, getResource("pcs_icon.png")]
 			) as Game.SelectorSwitch
