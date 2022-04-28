@@ -20,5 +20,5 @@ jobs:
       - name: Upload mod file
         uses: actions/upload-artifact@v3
         with:
-          name: perfectCookieSelector.zip
+          name: perfectCookieSelector
           path: "./mod.zip"
