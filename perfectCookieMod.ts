@@ -310,7 +310,7 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 				let name: string
 				let icon: Game.Icon
 				if (!save.selectedType) {
-					name = "Auto"
+					name = "Automatic"
 					icon = [0, 7]
 				} else {
 					const selectedType = getActivePC()
@@ -347,7 +347,7 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 					})
 				types.unshift({
 					icon: [0, 7],
-					name: "Auto",
+					name: "Automatic",
 					selected: save.selectedType === null,
 				})
 				return types
@@ -361,6 +361,7 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 				updatePerfectCookie()
 			}
 			Game.registerHook("reset", hard => {
+				save.selectedType = null
 				if (!hard) {
 					const candidates: PCType[] = []
 					candidates.push(pcTypesByName[defaultCookieName])
@@ -375,9 +376,10 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 					}
 					save.lastCookieBought =
 						candidates[Math.floor(Math.random() * candidates.length)].name
+					updatePerfectCookie()
 					return
 				}
-				save.selectedType = null
+
 				save.huBought = false
 			})
 			Game.registerHook("logic", () => {
