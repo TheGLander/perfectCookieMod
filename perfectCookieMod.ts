@@ -1,10 +1,10 @@
 /**
  * Hello, to add your custom cookie as an option in this, you have to do
- * `new PCSelector.PCType(name, link, maybeIcon, maybeRequirement)`
+ * `new PCSelector.PCType(name,, assets, maybeIcon, maybeRequirement)`
  * So, instead of `Game.Loader.Replace(bleh)`, maybe do:
  * ```js
  * if (window.PCSelector) {
- * 	new PCSelector.PCType("My awesome cookie", "link to your cookie")
+ * 	new PCSelector.PCType("My awesome cookie", { cookie: "link to your cookie" })
  * } else {
  * 	Game.Loader.Replace("perfectCookie.png", "link to your cookie")
  * }
@@ -170,12 +170,6 @@ namespace PCSelector {
 		cookie: "perfectCookie.png",
 		shadow: "cookieShadow.png",
 	}
-	export const assetDefaults: Record<AssetTypes, HTMLImageElement> = {
-		brokenCookie: Game.Loader.assets["brokenCookie.png"],
-		brokenCookieHalo: Game.Loader.assets["brokenCookieHalo.png"],
-		cookie: Game.Loader.assets["perfectCookie.png"],
-		shadow: Game.Loader.assets["cookieShadow.png"],
-	}
 
 	export type AssetTypes = typeof assetTypes[number]
 	export type AssetOpenMapped<V> = Record<AssetTypes, V>
@@ -205,7 +199,7 @@ namespace PCSelector {
 				const assetLink = assetLinks[assetName]
 				let img
 				if (!assetLink) {
-					img = assetDefaults[assetName]
+					img = Game.Loader.assets[assetAssociatedFiles[assetName]]
 				} else {
 					img = document.createElement("img")
 					img.src = assetLink
@@ -468,7 +462,9 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 			createCookieType("Zebra cookies")
 			createCookieType("Eclipse cookies")
 			createCookieType("Plain cookies")
-			createCookieType("Cookie crumbs")
+			createCookieType("Cookie crumbs", {
+				brokenCookieHalo: "cookie_crumbs_halo",
+			})
 			ready = true
 			this.load?.(this.save?.() || "")
 		},
