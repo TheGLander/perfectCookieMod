@@ -1,0 +1,24 @@
+name: Build mod file
+
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js 16.x
+        uses: actions/setup-node@v2
+        with:
+          cache: "yarn"
+          node-version: "16"
+      - name: Install Deps
+        run: yarn --immutable
+      - name: Build
+        run: ./createZip.sh
+      - name: Upload mod file
+        uses: actions/upload-artifact@v3
+        with:
+          name: perfectCookieSelector.zip
+          path: "./mod.zip"
