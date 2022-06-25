@@ -467,6 +467,13 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 			createCookieType("Cookie crumbs", {
 				brokenCookieHalo: "cookie_crumbs_halo",
 			})
+			createCookieType("Sugar cookies", { brokenCookieHalo: "sugar_halo" })
+			createCookieType("Oatmeal raisin cookies", {
+				brokenCookieHalo: "bumpy_cookie_halo",
+			})
+			createCookieType("Peanut butter cookies", {
+				brokenCookieHalo: "bumpy_cookie_halo",
+			})
 			ready = true
 			this.load?.(this.save?.() || "")
 		},
