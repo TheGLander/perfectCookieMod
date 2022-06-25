@@ -250,8 +250,9 @@ namespace PCSelector {
 	}
 
 	export function getActivePC(): PCType {
+		if (!upgrade.unlocked) return pcTypesByName[defaultCookieName]
+
 		let type: PCType | undefined
-		//save.selectedType
 
 		type =
 			pcTypesByName[
@@ -286,7 +287,6 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 				999,
 				[0, 0, getResource("pcs_icon.png")]
 			) as Game.HeavenlyUpgrade
-			//@ts-expect-error Forgot this in the typings
 			hu.ddesc = loc(hu.desc)
 			hu.dname = loc(hu.name)
 			hu.parents = [Game.Upgrades["Basic wallpaper assortment"]]
@@ -324,12 +324,8 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 					icon
 				)}transform:scale(0.5);margin:-16px;"></div> <b>${loc(
 					name
-				)}</b></div><div class="line"></div>${
-					//@ts-expect-error Forgot this in the typings
-					upgrade.ddesc
-				}`
+				)}</b></div><div class="line"></div>${upgrade.ddesc}`
 			}
-			//@ts-expect-error Forgot this in the typings
 			upgrade.ddesc = loc(upgrade.desc)
 			upgrade.dname = loc(upgrade.name)
 			upgrade.order = 50000 + upgrade.id / 1000
@@ -362,7 +358,14 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 			}
 			Game.registerHook("reset", hard => {
 				save.selectedType = null
-				if (!hard) {
+				if (hard) save.huBought = false
+			})
+			Game.registerHook("logic", () => {
+				updatePerfectCookie()
+			})
+			Game.registerHook("reincarnate", () => {
+				upgrade.unlocked = !!Game.Has(hu.name)
+				if (upgrade.unlocked) {
 					const candidates: PCType[] = []
 					candidates.push(pcTypesByName[defaultCookieName])
 					for (const cookie of Game.cookieUpgrades) {
@@ -376,17 +379,7 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 					}
 					save.lastCookieBought =
 						candidates[Math.floor(Math.random() * candidates.length)].name
-					updatePerfectCookie()
-					return
 				}
-
-				save.huBought = false
-			})
-			Game.registerHook("logic", () => {
-				updatePerfectCookie()
-			})
-			Game.registerHook("reincarnate", () => {
-				upgrade.unlocked = hu.bought
 				updatePerfectCookie()
 			})
 			Game.Loader.Load(["perfectCookie.png", "cookieShadow.png"])
@@ -484,7 +477,8 @@ Comes with a variety of basic flavors. <q>Show and admire your all cookies like 
 		load(data) {
 			save = JSON.parse(data)
 			updatePerfectCookie()
-			hu.bought = upgrade.unlocked = save.huBought
+			hu.bought = save.huBought
+			upgrade.unlocked = Game.Has(hu.name)
 			if (!save.lastCookieBought)
 				save.lastCookieBought = "Chocolate chip cookie"
 			Game.upgradesToRebuild = 1
